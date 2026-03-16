@@ -1,0 +1,102 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # CPU版PyTorchでのビルド・インストール・importテスト
+  build-cpu:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ['3.10', '3.12']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install (CPU)
+        run: pip install . --extra-index-url https://download.pytorch.org/whl/cpu
+
+      - name: Test import
+        run: |
+          python -c "
+          from kizuna_voice_designer import __version__, VoiceDesigner
+          print(f'Version: {__version__}')
+          assert __version__ == '0.1.0b1'
+          assert hasattr(VoiceDesigner, 'generate')
+          assert hasattr(VoiceDesigner, 'save')
+          assert hasattr(VoiceDesigner, 'save_embedding')
+          assert hasattr(VoiceDesigner, 'load_embedding')
+          print('IMPORT TEST: PASSED')
+          "
+
+      - name: Test downloader module
+        run: |
+          python -c "
+          from kizuna_voice_designer.downloader import CACHE_DIR, ensure_gpt_sovits
+          print(f'Cache dir: {CACHE_DIR}')
+          # GPT-SoVITSの自動ダウンロードテスト
+          gpt_dir = ensure_gpt_sovits()
+          assert (gpt_dir / 'GPT_SoVITS' / 'TTS_infer_pack' / 'TTS.py').exists()
+          print(f'GPT-SoVITS downloaded: {gpt_dir}')
+          print('DOWNLOADER TEST: PASSED')
+          "
+
+      - name: Build wheel
+        run: |
+          pip install build
+          python -m build
+
+      - name: Test wheel install
+        run: |
+          pip install dist/*.whl --force-reinstall --extra-index-url https://download.pytorch.org/whl/cpu
+          python -c "from kizuna_voice_designer import VoiceDesigner; print('WHEEL INSTALL TEST: PASSED')"
+
+      - name: Upload wheel
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheel-cpu
+          path: dist/*.whl
+
+  # CUDA版のビルドテスト（GPU実行はできないがビルド確認）
+  build-cuda:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install (CUDA index)
+        run: pip install . --extra-index-url https://download.pytorch.org/whl/cu124
+
+      - name: Test import with CUDA torch
+        run: |
+          python -c "
+          import torch
+          print(f'PyTorch: {torch.__version__}')
+          print(f'CUDA available: {torch.cuda.is_available()}')
+          from kizuna_voice_designer import VoiceDesigner
+          print('CUDA BUILD TEST: PASSED')
+          "
+
+      - name: Build wheel
+        run: |
+          pip install build
+          python -m build
+
+      - name: Upload wheel
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheel-cuda
+          path: dist/*.whl

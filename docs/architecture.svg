@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 620" font-family="sans-serif" font-size="13">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#555"/>
+    </marker>
+    <style>
+      .box { rx: 8; ry: 8; stroke-width: 2; }
+      .label { font-weight: bold; font-size: 14px; }
+      .sub { font-size: 11px; fill: #666; }
+      .arrow { stroke: #555; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <!-- Title -->
+  <text x="450" y="30" text-anchor="middle" font-size="20" font-weight="bold" fill="#222">Kizuna Voice Designer — Architecture</text>
+
+  <!-- 1. User Input -->
+  <rect x="30" y="60" width="200" height="80" class="box" fill="#E3F2FD" stroke="#1565C0"/>
+  <text x="130" y="90" text-anchor="middle" class="label" fill="#1565C0">User Input</text>
+  <text x="130" y="110" text-anchor="middle" class="sub">音声プロンプト (テキスト)</text>
+  <text x="130" y="125" text-anchor="middle" class="sub">読み上げテキスト</text>
+
+  <!-- Arrow 1→2 -->
+  <line x1="230" y1="100" x2="290" y2="100" class="arrow"/>
+
+  <!-- 2. OpenRouter API -->
+  <rect x="300" y="60" width="200" height="80" class="box" fill="#FFF3E0" stroke="#E65100"/>
+  <text x="400" y="88" text-anchor="middle" class="label" fill="#E65100">OpenRouter API</text>
+  <text x="400" y="108" text-anchor="middle" class="sub">Qwen3-Embedding-4B</text>
+  <text x="400" y="123" text-anchor="middle" class="sub">テキスト → 埋め込みベクトル</text>
+
+  <!-- Arrow 2→3 -->
+  <line x1="500" y1="100" x2="560" y2="100" class="arrow"/>
+
+  <!-- 3. FlowMatching -->
+  <rect x="570" y="60" width="290" height="80" class="box" fill="#E8F5E9" stroke="#2E7D32"/>
+  <text x="715" y="88" text-anchor="middle" class="label" fill="#2E7D32">FlowMatching Model</text>
+  <text x="715" y="108" text-anchor="middle" class="sub">テキスト埋め込み → GE埋め込み</text>
+  <text x="715" y="123" text-anchor="middle" class="sub">(声質ベクトル 1024次元)</text>
+
+  <!-- Arrow 3→4 (down) -->
+  <line x1="715" y1="140" x2="715" y2="190" class="arrow"/>
+
+  <!-- 4. GPT-SoVITS block -->
+  <rect x="100" y="200" width="720" height="220" class="box" fill="#F3E5F5" stroke="#6A1B9A" fill-opacity="0.3"/>
+  <text x="460" y="225" text-anchor="middle" class="label" fill="#6A1B9A" font-size="16">GPT-SoVITS v2Pro</text>
+
+  <!-- 4a. Text Preprocessor -->
+  <rect x="130" y="250" width="180" height="60" class="box" fill="#F3E5F5" stroke="#6A1B9A"/>
+  <text x="220" y="275" text-anchor="middle" class="label" fill="#6A1B9A">Text Preprocessor</text>
+  <text x="220" y="295" text-anchor="middle" class="sub">テキスト → 音素 + BERT</text>
+
+  <!-- Arrow: user input down to text preprocessor -->
+  <line x1="130" y1="140" x2="130" y2="175" class="arrow" style="stroke: #1565C0"/>
+  <line x1="130" y1="175" x2="220" y2="250" class="arrow" style="stroke: #1565C0"/>
+
+  <!-- 4b. GPT (T2S) -->
+  <rect x="370" y="250" width="180" height="60" class="box" fill="#F3E5F5" stroke="#6A1B9A"/>
+  <text x="460" y="275" text-anchor="middle" class="label" fill="#6A1B9A">GPT (T2S Model)</text>
+  <text x="460" y="295" text-anchor="middle" class="sub">音素 → セマンティックトークン</text>
+
+  <!-- Arrow 4a→4b -->
+  <line x1="310" y1="280" x2="370" y2="280" class="arrow"/>
+
+  <!-- 4c. VITS Decoder -->
+  <rect x="610" y="250" width="180" height="60" class="box" fill="#F3E5F5" stroke="#6A1B9A"/>
+  <text x="700" y="275" text-anchor="middle" class="label" fill="#6A1B9A">VITS Decoder</text>
+  <text x="700" y="295" text-anchor="middle" class="sub">トークン + GE → 音声波形</text>
+
+  <!-- Arrow 4b→4c -->
+  <line x1="550" y1="280" x2="610" y2="280" class="arrow"/>
+
+  <!-- Arrow: GE into VITS -->
+  <line x1="715" y1="190" x2="715" y2="250" class="arrow" style="stroke: #2E7D32"/>
+  <text x="730" y="220" class="sub" fill="#2E7D32">GE (声質)</text>
+
+  <!-- 4d. Components inside VITS -->
+  <rect x="610" y="330" width="180" height="70" class="box" fill="#FCE4EC" stroke="#C62828"/>
+  <text x="700" y="353" text-anchor="middle" class="sub" fill="#C62828">enc_p → Flow → Decoder</text>
+  <text x="700" y="370" text-anchor="middle" class="sub" fill="#C62828">BigVGAN vocoder</text>
+  <text x="700" y="387" text-anchor="middle" class="sub" fill="#C62828">32kHz output</text>
+
+  <!-- Arrow 4c→4d -->
+  <line x1="700" y1="310" x2="700" y2="330" class="arrow"/>
+
+  <!-- 5. Output -->
+  <rect x="350" y="460" width="200" height="70" class="box" fill="#E8EAF6" stroke="#283593"/>
+  <text x="450" y="490" text-anchor="middle" class="label" fill="#283593">Audio Output</text>
+  <text x="450" y="510" text-anchor="middle" class="sub">WAV 32kHz / Gradio Player</text>
+
+  <!-- Arrow 4d→5 -->
+  <line x1="700" y1="400" x2="700" y2="440" class="arrow"/>
+  <line x1="700" y1="440" x2="550" y2="495" class="arrow"/>
+
+  <!-- Legend -->
+  <rect x="30" y="550" width="840" height="55" rx="8" fill="#FAFAFA" stroke="#DDD"/>
+  <rect x="50" y="565" width="16" height="16" fill="#E3F2FD" stroke="#1565C0" rx="3"/>
+  <text x="72" y="578" class="sub">ユーザー入力</text>
+  <rect x="170" y="565" width="16" height="16" fill="#FFF3E0" stroke="#E65100" rx="3"/>
+  <text x="192" y="578" class="sub">外部API</text>
+  <rect x="270" y="565" width="16" height="16" fill="#E8F5E9" stroke="#2E7D32" rx="3"/>
+  <text x="292" y="578" class="sub">FlowMatchingモデル</text>
+  <rect x="430" y="565" width="16" height="16" fill="#F3E5F5" stroke="#6A1B9A" rx="3"/>
+  <text x="452" y="578" class="sub">GPT-SoVITS</text>
+  <rect x="550" y="565" width="16" height="16" fill="#E8EAF6" stroke="#283593" rx="3"/>
+  <text x="572" y="578" class="sub">出力</text>
+</svg>

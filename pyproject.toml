@@ -1,0 +1,62 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kizuna-voice-designer"
+version = "0.1.0b1"
+description = "Text prompt-based voice quality designer using FlowMatching + GPT-SoVITS"
+readme = "README.md"
+license = {file = "LICENSE"}
+requires-python = ">=3.10"
+keywords = ["tts", "voice-synthesis", "voice-design", "gpt-sovits", "flowmatching"]
+dependencies = [
+    "torch>=2.0",
+    "torchaudio",
+    "numpy",
+    "gradio>=4.0",
+    "transformers>=4.43",
+    "requests",
+    "soundfile",
+    "huggingface_hub",
+    # GPT-SoVITS 依存
+    "scipy",
+    "librosa==0.10.2",
+    "numba",
+    "pytorch-lightning>=2.4",
+    "cn2an",
+    "pypinyin",
+    "pyopenjtalk>=0.4.1",
+    "g2p_en",
+    "sentencepiece",
+    "peft",
+    "PyYAML",
+    "jieba_fast",
+    "jieba",
+    "wordsegment",
+    "rotary_embedding_torch",
+    "ToJyutping",
+    "g2pk2",
+    "ko_pron",
+    "split-lang",
+    "fast_langdetect>=0.3.1",
+    "x_transformers",
+    "torchmetrics<=1.5",
+    "tqdm",
+    "pandas",
+    "matplotlib",
+    "ffmpeg-python",
+]
+
+[project.optional-dependencies]
+gguf = ["llama-cpp-python"]
+
+[project.urls]
+Repository = "https://github.com/kizuna-intelligence/kizuna-voice-designer"
+Issues = "https://github.com/kizuna-intelligence/kizuna-voice-designer/issues"
+
+[project.scripts]
+kizuna-voice-designer = "kizuna_voice_designer.app:main"
+
+[tool.setuptools.packages.find]
+include = ["kizuna_voice_designer*"]
