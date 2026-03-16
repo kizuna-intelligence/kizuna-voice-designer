@@ -1,0 +1,51 @@
+# Kizuna Voice Designer 依存パッケージ
+#
+# 注意: PyTorch (torch, torchaudio) は環境に合わせて事前にインストールしてください
+#   NVIDIA (CUDA): pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
+#   AMD (ROCm):    pip install torch torchaudio --index-url https://download.pytorch.org/whl/rocm6.2
+#   CPU:           pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+#
+# その後: pip install -r requirements.txt
+
+# === コアライブラリ ===
+numpy
+soundfile
+
+# === テキスト埋め込み ===
+transformers>=4.43
+huggingface_hub
+llama-cpp-python  # local_lightweight モード用
+
+# === Web UI ===
+gradio>=4.0
+
+# === GPT-SoVITS 依存 ===
+scipy
+librosa==0.10.2
+numba
+pytorch-lightning>=2.4
+cn2an
+pypinyin
+pyopenjtalk>=0.4.1
+g2p_en
+sentencepiece
+peft
+PyYAML
+jieba_fast
+jieba
+wordsegment
+rotary_embedding_torch
+ToJyutping
+g2pk2
+ko_pron
+split-lang
+fast_langdetect>=0.3.1
+x_transformers
+torchmetrics<=1.5
+tqdm
+requests
+
+# === その他 ===
+pandas
+matplotlib
+ffmpeg-python

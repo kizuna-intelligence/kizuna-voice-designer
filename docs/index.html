@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kizuna Voice Designer - Demo</title>
+<style>
+  body { font-family: -apple-system, sans-serif; max-width: 800px; margin: 0 auto; padding: 2rem; background: #fafafa; color: #333; }
+  h1 { border-bottom: 2px solid #e0e0e0; padding-bottom: 0.5rem; }
+  .sample { background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 1.2rem; margin-bottom: 1rem; }
+  .sample h3 { margin: 0 0 0.3rem 0; }
+  .sample p { margin: 0.3rem 0; color: #666; font-size: 0.9rem; white-space: pre-line; }
+  .sample .text { color: #333; font-style: italic; margin-top: 0.5rem; }
+  audio { width: 100%; margin-top: 0.5rem; }
+  a { color: #0066cc; }
+  .badge { display: inline-block; background: #e8f5e9; color: #2e7d32; padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.8rem; }
+  .footer { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #e0e0e0; font-size: 0.85rem; color: #999; }
+</style>
+</head>
+<body>
+
+<h1>Kizuna Voice Designer <span class="badge">v0.1.0-beta</span></h1>
+<p>テキストプロンプトから声質を生成するPythonライブラリ。以下はデモ音声です。</p>
+<p><a href="https://github.com/kizuna-intelligence/kizuna-voice-designer">GitHub リポジトリ</a></p>
+
+<h2>Demo Samples</h2>
+
+<div class="sample">
+  <h3>コンシェルジュ（30代前半・透明感）</h3>
+  <p>30代前半の女性 落ち着きのある透明感ボイスで
+言葉の間に十分な余白を取りつつ丁寧に
+高級ホテルのラウンジで客に寄り添うコンシェルジュ</p>
+  <p class="text">「こちらのお席でよろしければ、すぐにお飲み物をご用意いたします。」</p>
+  <audio controls src="samples/コンシェルジュ.wav"></audio>
+</div>
+
+<div class="sample">
+  <h3>ツンデレ幼馴染（16歳・高め）</h3>
+  <p>16歳の女の子 やや高めの澄んだ声で
+素直になれず早口で誤魔化すツンデレ調
+放課後の帰り道で主人公に文句を言いつつ待っている幼馴染</p>
+  <p class="text">「べ、別に待ってたわけじゃないんだから！早く帰るわよ！」</p>
+  <audio controls src="samples/ツンデレ幼馴染.wav"></audio>
+</div>
+
+<div class="sample">
+  <h3>朗読系ラジオDJ（30代・低音）</h3>
+  <p>30代男性 深みのある低音、滑らかな語り
+ゆったりした深夜ラジオ調
+深夜に物語を朗読するDJ</p>
+  <p class="text">「この夜の静けさに、少しだけ物語を添えてみましょう。」</p>
+  <audio controls src="samples/朗読系ラジオDJ.wav"></audio>
+</div>
+
+<div class="sample">
+  <h3>穏やか教師（30代・優しい）</h3>
+  <p>30代男性 落ち着いた中低音、ゆっくり丁寧語
+安心させる優しいトーン
+放課後の教室で生徒を励ます教師</p>
+  <p class="text">「わからないところは一緒にやろう。焦らなくていい。」</p>
+  <audio controls src="samples/穏やか教師.wav"></audio>
+</div>
+
+<div class="sample">
+  <h3>おっとり青年店員（20代・柔らか）</h3>
+  <p>20代男性 柔らかい中音、マイペース丁寧語
+穏やかでスローテンポ
+カフェカウンターで接客する店員</p>
+  <p class="text">「少々お時間いただきますね。ゆっくりお待ちください。」</p>
+  <audio controls src="samples/おっとり青年店員.wav"></audio>
+</div>
+
+<div class="footer">
+  <p>Kizuna Voice Designer by <a href="https://github.com/kizuna-intelligence">kizuna-intelligence</a> | <a href="https://github.com/kizuna-intelligence/kizuna-voice-designer/blob/main/LICENSE">Kizuna Community License v1.0</a></p>
+</div>
+
+</body>
+</html>

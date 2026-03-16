@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+env/
+.venv/
+
+# Models (large files)
+models/
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+
+# Outputs
+outputs/
+*.wav
+*.mp3
+*.npy
+
+# Allow demo samples
+!docs/samples/*.wav
+
+# Environment
+.env
+.env.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+nohup.out
+
+# GPT-SoVITS (downloaded at runtime, not tracked)
+GPT-SoVITS/
+GPT_SoVITS/
+
+# Temp
+tmp/
+temp/
+build/
+*.egg-info/
+demo_outputs/
