@@ -77,6 +77,7 @@ class VoiceDesigner:
 
         # Ensure pretrained models are available
         ensure_pretrained_models()
+        self._ensure_nltk_resources()
 
         self.openrouter_key = openrouter_key or ""
 
@@ -121,6 +122,23 @@ class VoiceDesigner:
         self._synthesizer = None
         self._tts = None
         self._llama_model = None
+
+    def _ensure_nltk_resources(self) -> None:
+        try:
+            import nltk
+        except ImportError:
+            return
+
+        resources = [
+            ("corpora/cmudict", "cmudict"),
+            ("taggers/averaged_perceptron_tagger_eng", "averaged_perceptron_tagger_eng"),
+            ("taggers/averaged_perceptron_tagger", "averaged_perceptron_tagger"),
+        ]
+        for resource_path, resource_name in resources:
+            try:
+                nltk.data.find(resource_path)
+            except LookupError:
+                nltk.download(resource_name, quiet=True)
 
     def _normalize_device(self, device_str: str) -> str:
         import torch

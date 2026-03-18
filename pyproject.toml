@@ -46,6 +46,7 @@ dependencies = [
     "pandas",
     "matplotlib",
     "ffmpeg-python",
+    "llama-cpp-python",
 ]
 
 [project.optional-dependencies]
