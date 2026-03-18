@@ -35,7 +35,10 @@ def resolve_device(device_str: str | None) -> Any:
 def tts_device_str(device_str: str | None) -> str:
     normalized = normalize_device_str(device_str)
     if normalized == "directml":
-        return "privateuseone:0"
+        # GPT-SoVITS upstream still assumes torch.load(map_location=...) can round-trip
+        # the device string through torch.device(), which breaks on DirectML.
+        # Keep FlowMatching on DirectML and run the decoder stack on CPU.
+        return "cpu"
     return normalized
 
 

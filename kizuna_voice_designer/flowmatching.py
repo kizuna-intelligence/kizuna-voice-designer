@@ -191,7 +191,7 @@ class TextToVoiceFlowSynthesizer:
 
         print(f"Models loaded on {self.device}")
 
-    @torch.inference_mode()
+    @torch.no_grad()
     def encode_text(self, text: str, max_length: int = 512) -> torch.Tensor:
         """テキストを埋め込みに変換（事前計算があればロード）"""
         if self.text_emb_dir:
@@ -224,7 +224,7 @@ class TextToVoiceFlowSynthesizer:
             embedding = embedding.unsqueeze(0)
         return embedding
 
-    @torch.inference_mode()
+    @torch.no_grad()
     def sample_from_flow(
         self,
         text_emb: torch.Tensor,
@@ -266,7 +266,7 @@ class TextToVoiceFlowSynthesizer:
 
         return x
 
-    @torch.inference_mode()
+    @torch.no_grad()
     def text_to_ge_embedding(
         self,
         text_prompt: str,

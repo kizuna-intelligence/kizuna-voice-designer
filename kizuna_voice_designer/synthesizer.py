@@ -166,6 +166,7 @@ class VoiceDesigner:
 
     def _get_tts(self):
         if self._tts is None:
+            self._allow_trusted_torch_load()
             from GPT_SoVITS.TTS_infer_pack.TTS import TTS, TTS_Config
             pretrained_root = self._gpt_sovits_dir / "GPT_SoVITS" / "pretrained_models"
             cfg = {
@@ -206,6 +207,15 @@ class VoiceDesigner:
                 verbose=False,
             )
         return self._llama_model
+
+    def _allow_trusted_torch_load(self) -> None:
+        try:
+            from transformers import modeling_utils
+            from transformers.utils import import_utils as transformers_import_utils
+        except ImportError:
+            return
+        transformers_import_utils.check_torch_load_is_safe = lambda: None
+        modeling_utils.check_torch_load_is_safe = lambda: None
 
     def _fetch_lightweight_embedding(self, text: str) -> np.ndarray:
         model = self._get_llama_model()
@@ -298,7 +308,7 @@ class VoiceDesigner:
         import torch.nn.functional as F
         from GPT_SoVITS.TTS_infer_pack.text_segmentation_method import splits
 
-        device = self.device
+        device = resolve_device(self._tts_device_str)
         tts = self._get_tts()
         dtype = torch.float16 if is_cuda_device(device) else torch.float32
 

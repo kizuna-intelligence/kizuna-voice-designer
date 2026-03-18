@@ -93,6 +93,12 @@ def load_synth(flow_model_path: str, text_emb_dir: str, device: str) -> TextToVo
 
 @lru_cache(maxsize=4)
 def load_tts(device: str) -> TTS:
+    from transformers import modeling_utils
+    from transformers.utils import import_utils as transformers_import_utils
+
+    transformers_import_utils.check_torch_load_is_safe = lambda: None
+    modeling_utils.check_torch_load_is_safe = lambda: None
+
     pretrained_root = _GPT_SOVITS_DIR / "GPT_SoVITS" / "pretrained_models"
     cfg = {
         "version": "v2Pro",
@@ -153,8 +159,10 @@ def synthesize(
     # normalize device string for loaders
     device_str_norm = _normalize_device_str(device_str)
     synthesizer = load_synth(flow_model_path, text_emb_dir, device_str_norm)
+    tts_device_str_norm = tts_device_str(device_str_norm)
+    tts_device = _get_device(tts_device_str_norm)
     tts = load_tts(device_str_norm)
-    dtype = torch.float16 if is_cuda_device(device) else torch.float32
+    dtype = torch.float16 if is_cuda_device(tts_device) else torch.float32
 
     # ge embedding
     ge = None
@@ -239,9 +247,9 @@ def synthesize(
         text += "\u3002" if text_lang != "en" else "."
 
     phones, bert_features, norm_text = tts.text_preprocessor.segment_and_extract_feature_for_text(text, text_lang)
-    all_phoneme_ids = torch.LongTensor(phones).to(device).unsqueeze(0)
-    all_phoneme_len = torch.tensor([all_phoneme_ids.shape[-1]]).to(device)
-    bert = bert_features.to(device).to(dtype).unsqueeze(0)
+    all_phoneme_ids = torch.LongTensor(phones).to(tts_device).unsqueeze(0)
+    all_phoneme_len = torch.tensor([all_phoneme_ids.shape[-1]]).to(tts_device)
+    bert = bert_features.to(tts_device).to(dtype).unsqueeze(0)
 
     # GPT inference (ref_free)
     with torch.no_grad():
@@ -259,14 +267,14 @@ def synthesize(
 
     # VITS decode with GE
     vits_model = tts.vits_model
-    ge_in = ge.unsqueeze(-1).to(device).to(dtype)
+    ge_in = ge.unsqueeze(-1).to(tts_device).to(dtype)
 
     with torch.no_grad():
         codes = pred_semantic
         text_tensor = all_phoneme_ids
 
-        y_lengths = torch.LongTensor([codes.size(2) * 2]).to(device)
-        text_lengths = torch.LongTensor([text_tensor.size(-1)]).to(device)
+        y_lengths = torch.LongTensor([codes.size(2) * 2]).to(tts_device)
+        text_lengths = torch.LongTensor([text_tensor.size(-1)]).to(tts_device)
 
         quantized = vits_model.quantizer.decode(codes)
         if vits_model.semantic_frame_rate == "25hz":

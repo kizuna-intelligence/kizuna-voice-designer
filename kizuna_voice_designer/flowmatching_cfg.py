@@ -165,7 +165,7 @@ class TextToVoiceFlowCFGSynthesizer:
         print(f"Models loaded on {self.device}")
         print(f"Default guidance_scale: {self.guidance_scale}, num_sample_steps: {self.num_sample_steps}")
 
-    @torch.inference_mode()
+    @torch.no_grad()
     def encode_text(self, text: str, max_length: int = 512) -> torch.Tensor:
         if self.text_emb_dir:
             h = hashlib.md5(text.encode()).hexdigest()[:16]
@@ -191,7 +191,7 @@ class TextToVoiceFlowCFGSynthesizer:
 
         return embedding.float()
 
-    @torch.inference_mode()
+    @torch.no_grad()
     def sample_from_flow_cfg(
         self,
         text_emb: torch.Tensor,
@@ -235,7 +235,7 @@ class TextToVoiceFlowCFGSynthesizer:
 
         return x
 
-    @torch.inference_mode()
+    @torch.no_grad()
     def text_to_ge_embedding(
         self,
         text_prompt: str,
