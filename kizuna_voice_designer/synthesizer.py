@@ -14,6 +14,13 @@ from kizuna_voice_designer.downloader import (
     ensure_flow_model,
     CACHE_DIR,
 )
+from kizuna_voice_designer.device_utils import (
+    has_gpu_backend,
+    is_cuda_device,
+    normalize_device_str,
+    resolve_device,
+    tts_device_str,
+)
 
 
 class VoiceDesigner:
@@ -104,7 +111,9 @@ class VoiceDesigner:
         self.text_emb_dir = text_emb_dir
 
         # Device
-        self.device_str = self._normalize_device(device)
+        self.device_str = normalize_device_str(device)
+        self.device = resolve_device(device)
+        self._tts_device_str = tts_device_str(device)
 
         # Params
         self.cfg_scale = cfg_scale
@@ -140,21 +149,6 @@ class VoiceDesigner:
             except LookupError:
                 nltk.download(resource_name, quiet=True)
 
-    def _normalize_device(self, device_str: str) -> str:
-        import torch
-        if device_str.startswith("cuda") and torch.cuda.is_available():
-            try:
-                req_idx = int(device_str.split(":")[1])
-            except (IndexError, ValueError):
-                req_idx = 0
-            max_idx = torch.cuda.device_count() - 1
-            if max_idx < 0:
-                return "cpu"
-            if req_idx > max_idx:
-                return f"cuda:{max_idx}"
-            return f"cuda:{req_idx}"
-        return "cpu"
-
     def _get_synthesizer(self):
         if self._synthesizer is None:
             from kizuna_voice_designer.flowmatching import TextToVoiceFlowSynthesizer
@@ -176,8 +170,8 @@ class VoiceDesigner:
             pretrained_root = self._gpt_sovits_dir / "GPT_SoVITS" / "pretrained_models"
             cfg = {
                 "version": "v2Pro",
-                "device": self.device_str,
-                "is_half": True,
+                "device": self._tts_device_str,
+                "is_half": is_cuda_device(self.device),
                 "t2s_weights_path": str(pretrained_root / "s1v3.ckpt"),
                 "vits_weights_path": str(pretrained_root / "v2Pro" / "s2Gv2Pro.pth"),
                 "bert_base_path": str(pretrained_root / "chinese-roberta-wwm-ext-large"),
@@ -206,7 +200,7 @@ class VoiceDesigner:
             self._llama_model = Llama(
                 model_path=model_path,
                 n_ctx=512,
-                n_gpu_layers=-1,
+                n_gpu_layers=-1 if self.device_str.startswith("cuda:") else 0,
                 main_gpu=gpu_idx,
                 embedding=True,
                 verbose=False,
@@ -243,7 +237,7 @@ class VoiceDesigner:
         import torch
         from kizuna_voice_designer.flowmatching_cfg import TextToVoiceFlowCFGSynthesizer
 
-        device = torch.device(self.device_str)
+        device = self.device
         synthesizer = self._get_synthesizer()
         is_cfg_model = isinstance(synthesizer, TextToVoiceFlowCFGSynthesizer)
 
@@ -271,7 +265,7 @@ class VoiceDesigner:
             emb_t = torch.from_numpy(emb_np).to(device)
             if emb_t.dim() == 1:
                 emb_t = emb_t.unsqueeze(0)
-            if device.type == "cuda":
+            if is_cuda_device(device):
                 emb_t = emb_t.half()
 
             original_encode = synthesizer.encode_text
@@ -304,9 +298,9 @@ class VoiceDesigner:
         import torch.nn.functional as F
         from GPT_SoVITS.TTS_infer_pack.text_segmentation_method import splits
 
-        device = torch.device(self.device_str)
+        device = self.device
         tts = self._get_tts()
-        dtype = torch.float16 if device.type == "cuda" else torch.float32
+        dtype = torch.float16 if is_cuda_device(device) else torch.float32
 
         # Text preprocessing
         read_text = text.strip()
@@ -373,11 +367,11 @@ class VoiceDesigner:
         """
         import torch
 
-        device = torch.device(self.device_str)
+        device = self.device
 
         if embedding is not None:
             ge = torch.from_numpy(embedding).to(device)
-            if device.type == "cuda":
+            if is_cuda_device(device):
                 ge = ge.half()
         else:
             ge = self._generate_ge(prompt)

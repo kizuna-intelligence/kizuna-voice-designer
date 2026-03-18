@@ -14,6 +14,8 @@ import torch.nn.functional as F
 import numpy as np
 from transformers import AutoModel, AutoTokenizer
 
+from kizuna_voice_designer.device_utils import resolve_device
+
 
 class SinusoidalPositionEmbeddings(nn.Module):
     def __init__(self, dim: int):
@@ -129,7 +131,7 @@ class TextToVoiceFlowCFGSynthesizer:
         text_emb_dir: str = "",
         device: str = "cuda",
     ):
-        self.device = torch.device(device if torch.cuda.is_available() else "cpu")
+        self.device = resolve_device(device)
 
         self.text_emb_dir = text_emb_dir
         if text_emb_dir:
@@ -142,7 +144,7 @@ class TextToVoiceFlowCFGSynthesizer:
             self.text_model.eval()
 
         print(f"Loading FlowMatching CFG model: {flowmatching_model_path}")
-        checkpoint = torch.load(flowmatching_model_path, map_location=self.device, weights_only=False)
+        checkpoint = torch.load(flowmatching_model_path, map_location="cpu", weights_only=False)
         config = checkpoint.get("config", {})
 
         self.flow_model = FlowMatchingVelocityNetCFG(
