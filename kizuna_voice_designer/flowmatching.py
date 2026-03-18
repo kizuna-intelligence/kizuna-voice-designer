@@ -14,6 +14,8 @@ import numpy as np
 from transformers import AutoModel, AutoTokenizer
 from pathlib import Path
 
+from kizuna_voice_designer.device_utils import is_cuda_device, resolve_device
+
 
 # Flow Matching用ネットワーク定義
 class SinusoidalPositionEmbeddings(nn.Module):
@@ -147,7 +149,7 @@ class TextToVoiceFlowSynthesizer:
         text_emb_dir: str = "",
         device: str = "cuda",
     ):
-        self.device = torch.device(device if torch.cuda.is_available() else "cpu")
+        self.device = resolve_device(device)
         self.text_emb_dir = Path(text_emb_dir) if text_emb_dir else None
 
         # テキスト埋め込みモデルをロード
@@ -158,13 +160,17 @@ class TextToVoiceFlowSynthesizer:
         else:
             print(f"Loading text embedding model: {text_embedding_model}")
             self.tokenizer = AutoTokenizer.from_pretrained(text_embedding_model, trust_remote_code=True)
-            self.text_model = AutoModel.from_pretrained(text_embedding_model, trust_remote_code=True, torch_dtype=torch.float16)
+            model_dtype = torch.float16 if is_cuda_device(self.device) else torch.float32
+            self.text_model = AutoModel.from_pretrained(
+                text_embedding_model, trust_remote_code=True, torch_dtype=model_dtype
+            )
             self.text_model = self.text_model.to(self.device)
             self.text_model.eval()
 
         # FlowMatching Networkをロード
         print(f"Loading FlowMatching model: {flowmatching_model_path}")
-        checkpoint = torch.load(flowmatching_model_path, map_location=self.device, weights_only=False)
+        map_location = self.device if is_cuda_device(self.device) else "cpu"
+        checkpoint = torch.load(flowmatching_model_path, map_location=map_location, weights_only=False)
         config = checkpoint.get("config", {})
 
         self.flow_model = FlowMatchingVelocityNet(
@@ -177,7 +183,7 @@ class TextToVoiceFlowSynthesizer:
         )
         self.flow_model.load_state_dict(checkpoint["model_state_dict"])
         self.flow_model = self.flow_model.to(self.device)
-        if self.device.type == "cuda":
+        if is_cuda_device(self.device):
             self.flow_model = self.flow_model.half()
         self.flow_model.eval()
 
@@ -185,7 +191,7 @@ class TextToVoiceFlowSynthesizer:
 
         print(f"Models loaded on {self.device}")
 
-    @torch.inference_mode()
+    @torch.no_grad()
     def encode_text(self, text: str, max_length: int = 512) -> torch.Tensor:
         """テキストを埋め込みに変換（事前計算があればロード）"""
         if self.text_emb_dir:
@@ -196,7 +202,7 @@ class TextToVoiceFlowSynthesizer:
             emb = torch.from_numpy(np.load(path)).to(self.device)
             if emb.dim() == 1:
                 emb = emb.unsqueeze(0)
-            return emb.half() if self.device.type == "cuda" else emb.float()
+            return emb.half() if is_cuda_device(self.device) else emb.float()
 
         inputs = self.tokenizer(
             text, padding=True, truncation=True,
@@ -213,12 +219,12 @@ class TextToVoiceFlowSynthesizer:
         sum_mask = torch.clamp(mask_expanded.sum(dim=1), min=1e-9)
         embedding = sum_embeddings / sum_mask
 
-        embedding = embedding.half() if self.device.type == "cuda" else embedding.float()
+        embedding = embedding.half() if is_cuda_device(self.device) else embedding.float()
         if embedding.dim() == 1:
             embedding = embedding.unsqueeze(0)
         return embedding
 
-    @torch.inference_mode()
+    @torch.no_grad()
     def sample_from_flow(
         self,
         text_emb: torch.Tensor,
@@ -260,7 +266,7 @@ class TextToVoiceFlowSynthesizer:
 
         return x
 
-    @torch.inference_mode()
+    @torch.no_grad()
     def text_to_ge_embedding(
         self,
         text_prompt: str,

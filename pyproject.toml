@@ -46,10 +46,17 @@ dependencies = [
     "pandas",
     "matplotlib",
     "ffmpeg-python",
+    "llama-cpp-python",
 ]
 
 [project.optional-dependencies]
 gguf = ["llama-cpp-python"]
+amd = [
+    "torch==2.4.1",
+    "torchaudio==2.4.1",
+    "torchvision==0.19.1",
+    "torch-directml",
+]
 
 [project.urls]
 Repository = "https://github.com/kizuna-intelligence/kizuna-voice-designer"

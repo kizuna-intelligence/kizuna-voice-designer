@@ -14,6 +14,13 @@ from kizuna_voice_designer.downloader import (
     ensure_flow_model,
     CACHE_DIR,
 )
+from kizuna_voice_designer.device_utils import (
+    has_gpu_backend,
+    is_cuda_device,
+    normalize_device_str,
+    resolve_device,
+    tts_device_str,
+)
 
 
 class VoiceDesigner:
@@ -77,6 +84,7 @@ class VoiceDesigner:
 
         # Ensure pretrained models are available
         ensure_pretrained_models()
+        self._ensure_nltk_resources()
 
         self.openrouter_key = openrouter_key or ""
 
@@ -103,7 +111,9 @@ class VoiceDesigner:
         self.text_emb_dir = text_emb_dir
 
         # Device
-        self.device_str = self._normalize_device(device)
+        self.device_str = normalize_device_str(device)
+        self.device = resolve_device(device)
+        self._tts_device_str = tts_device_str(device)
 
         # Params
         self.cfg_scale = cfg_scale
@@ -122,20 +132,22 @@ class VoiceDesigner:
         self._tts = None
         self._llama_model = None
 
-    def _normalize_device(self, device_str: str) -> str:
-        import torch
-        if device_str.startswith("cuda") and torch.cuda.is_available():
+    def _ensure_nltk_resources(self) -> None:
+        try:
+            import nltk
+        except ImportError:
+            return
+
+        resources = [
+            ("corpora/cmudict", "cmudict"),
+            ("taggers/averaged_perceptron_tagger_eng", "averaged_perceptron_tagger_eng"),
+            ("taggers/averaged_perceptron_tagger", "averaged_perceptron_tagger"),
+        ]
+        for resource_path, resource_name in resources:
             try:
-                req_idx = int(device_str.split(":")[1])
-            except (IndexError, ValueError):
-                req_idx = 0
-            max_idx = torch.cuda.device_count() - 1
-            if max_idx < 0:
-                return "cpu"
-            if req_idx > max_idx:
-                return f"cuda:{max_idx}"
-            return f"cuda:{req_idx}"
-        return "cpu"
+                nltk.data.find(resource_path)
+            except LookupError:
+                nltk.download(resource_name, quiet=True)
 
     def _get_synthesizer(self):
         if self._synthesizer is None:
@@ -154,12 +166,13 @@ class VoiceDesigner:
 
     def _get_tts(self):
         if self._tts is None:
+            self._allow_trusted_torch_load()
             from GPT_SoVITS.TTS_infer_pack.TTS import TTS, TTS_Config
             pretrained_root = self._gpt_sovits_dir / "GPT_SoVITS" / "pretrained_models"
             cfg = {
                 "version": "v2Pro",
-                "device": self.device_str,
-                "is_half": True,
+                "device": self._tts_device_str,
+                "is_half": is_cuda_device(self.device),
                 "t2s_weights_path": str(pretrained_root / "s1v3.ckpt"),
                 "vits_weights_path": str(pretrained_root / "v2Pro" / "s2Gv2Pro.pth"),
                 "bert_base_path": str(pretrained_root / "chinese-roberta-wwm-ext-large"),
@@ -188,12 +201,21 @@ class VoiceDesigner:
             self._llama_model = Llama(
                 model_path=model_path,
                 n_ctx=512,
-                n_gpu_layers=-1,
+                n_gpu_layers=-1 if self.device_str.startswith("cuda:") else 0,
                 main_gpu=gpu_idx,
                 embedding=True,
                 verbose=False,
             )
         return self._llama_model
+
+    def _allow_trusted_torch_load(self) -> None:
+        try:
+            from transformers import modeling_utils
+            from transformers.utils import import_utils as transformers_import_utils
+        except ImportError:
+            return
+        transformers_import_utils.check_torch_load_is_safe = lambda: None
+        modeling_utils.check_torch_load_is_safe = lambda: None
 
     def _fetch_lightweight_embedding(self, text: str) -> np.ndarray:
         model = self._get_llama_model()
@@ -225,7 +247,7 @@ class VoiceDesigner:
         import torch
         from kizuna_voice_designer.flowmatching_cfg import TextToVoiceFlowCFGSynthesizer
 
-        device = torch.device(self.device_str)
+        device = self.device
         synthesizer = self._get_synthesizer()
         is_cfg_model = isinstance(synthesizer, TextToVoiceFlowCFGSynthesizer)
 
@@ -253,7 +275,7 @@ class VoiceDesigner:
             emb_t = torch.from_numpy(emb_np).to(device)
             if emb_t.dim() == 1:
                 emb_t = emb_t.unsqueeze(0)
-            if device.type == "cuda":
+            if is_cuda_device(device):
                 emb_t = emb_t.half()
 
             original_encode = synthesizer.encode_text
@@ -286,9 +308,9 @@ class VoiceDesigner:
         import torch.nn.functional as F
         from GPT_SoVITS.TTS_infer_pack.text_segmentation_method import splits
 
-        device = torch.device(self.device_str)
+        device = resolve_device(self._tts_device_str)
         tts = self._get_tts()
-        dtype = torch.float16 if device.type == "cuda" else torch.float32
+        dtype = torch.float16 if is_cuda_device(device) else torch.float32
 
         # Text preprocessing
         read_text = text.strip()
@@ -355,11 +377,11 @@ class VoiceDesigner:
         """
         import torch
 
-        device = torch.device(self.device_str)
+        device = self.device
 
         if embedding is not None:
             ge = torch.from_numpy(embedding).to(device)
-            if device.type == "cuda":
+            if is_cuda_device(device):
                 ge = ge.half()
         else:
             ge = self._generate_ge(prompt)

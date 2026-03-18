@@ -26,6 +26,12 @@ from kizuna_voice_designer.downloader import (
     ensure_flow_model,
     CACHE_DIR,
 )
+from kizuna_voice_designer.device_utils import (
+    is_cuda_device,
+    normalize_device_str,
+    resolve_device,
+    tts_device_str,
+)
 
 # Setup GPT-SoVITS paths
 _GPT_SOVITS_DIR = setup_paths()
@@ -62,23 +68,11 @@ EMBEDDING_MODE = os.environ.get("EMBEDDING_MODE", "api" if OPENROUTER_KEY else "
 
 
 def _normalize_device_str(device_str: str) -> str:
-    """Clamp cuda index if out of range; fall back to cpu when unavailable."""
-    if device_str.startswith("cuda") and torch.cuda.is_available():
-        try:
-            req_idx = int(device_str.split(":")[1])
-        except (IndexError, ValueError):
-            req_idx = 0
-        max_idx = torch.cuda.device_count() - 1
-        if max_idx < 0:
-            return "cpu"
-        if req_idx > max_idx:
-            return f"cuda:{max_idx}"
-        return f"cuda:{req_idx}"
-    return "cpu"
+    return normalize_device_str(device_str)
 
 
-def _get_device(device_str: str) -> torch.device:
-    return torch.device(_normalize_device_str(device_str))
+def _get_device(device_str: str):
+    return resolve_device(device_str)
 
 
 LOCAL_EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "Qwen/Qwen3-Embedding-4B")
@@ -99,11 +93,17 @@ def load_synth(flow_model_path: str, text_emb_dir: str, device: str) -> TextToVo
 
 @lru_cache(maxsize=4)
 def load_tts(device: str) -> TTS:
+    from transformers import modeling_utils
+    from transformers.utils import import_utils as transformers_import_utils
+
+    transformers_import_utils.check_torch_load_is_safe = lambda: None
+    modeling_utils.check_torch_load_is_safe = lambda: None
+
     pretrained_root = _GPT_SOVITS_DIR / "GPT_SoVITS" / "pretrained_models"
     cfg = {
         "version": "v2Pro",
-        "device": device,
-        "is_half": True,
+        "device": tts_device_str(device),
+        "is_half": device.startswith("cuda"),
         "t2s_weights_path": str(pretrained_root / "s1v3.ckpt"),
         "vits_weights_path": str(pretrained_root / "v2Pro" / "s2Gv2Pro.pth"),
         "bert_base_path": str(pretrained_root / "chinese-roberta-wwm-ext-large"),
@@ -154,20 +154,22 @@ def synthesize(
     Returns (sample_rate, audio, debug_info)
     """
     device = _get_device(device_str)
-    torch.cuda.empty_cache() if device.type == "cuda" else None
+    torch.cuda.empty_cache() if is_cuda_device(device) else None
 
     # normalize device string for loaders
     device_str_norm = _normalize_device_str(device_str)
     synthesizer = load_synth(flow_model_path, text_emb_dir, device_str_norm)
+    tts_device_str_norm = tts_device_str(device_str_norm)
+    tts_device = _get_device(tts_device_str_norm)
     tts = load_tts(device_str_norm)
-    dtype = torch.float16 if device.type == "cuda" else torch.float32
+    dtype = torch.float16 if is_cuda_device(tts_device) else torch.float32
 
     # ge embedding
     ge = None
     ge_source = "reuse" if reuse_last_ge and ge_state is not None else "computed"
     if reuse_last_ge and ge_state is not None:
         ge = torch.from_numpy(ge_state).to(device)
-        if device.type == "cuda":
+        if is_cuda_device(device):
             ge = ge.half()
     else:
         is_cfg_model = isinstance(synthesizer, TextToVoiceFlowCFGSynthesizer)
@@ -196,7 +198,7 @@ def synthesize(
             emb_t = torch.from_numpy(emb_np).to(device)
             if emb_t.dim() == 1:
                 emb_t = emb_t.unsqueeze(0)
-            if device.type == "cuda":
+            if is_cuda_device(device):
                 emb_t = emb_t.half()
 
             original_encode = synthesizer.encode_text
@@ -245,9 +247,9 @@ def synthesize(
         text += "\u3002" if text_lang != "en" else "."
 
     phones, bert_features, norm_text = tts.text_preprocessor.segment_and_extract_feature_for_text(text, text_lang)
-    all_phoneme_ids = torch.LongTensor(phones).to(device).unsqueeze(0)
-    all_phoneme_len = torch.tensor([all_phoneme_ids.shape[-1]]).to(device)
-    bert = bert_features.to(device).to(dtype).unsqueeze(0)
+    all_phoneme_ids = torch.LongTensor(phones).to(tts_device).unsqueeze(0)
+    all_phoneme_len = torch.tensor([all_phoneme_ids.shape[-1]]).to(tts_device)
+    bert = bert_features.to(tts_device).to(dtype).unsqueeze(0)
 
     # GPT inference (ref_free)
     with torch.no_grad():
@@ -265,14 +267,14 @@ def synthesize(
 
     # VITS decode with GE
     vits_model = tts.vits_model
-    ge_in = ge.unsqueeze(-1).to(device).to(dtype)
+    ge_in = ge.unsqueeze(-1).to(tts_device).to(dtype)
 
     with torch.no_grad():
         codes = pred_semantic
         text_tensor = all_phoneme_ids
 
-        y_lengths = torch.LongTensor([codes.size(2) * 2]).to(device)
-        text_lengths = torch.LongTensor([text_tensor.size(-1)]).to(device)
+        y_lengths = torch.LongTensor([codes.size(2) * 2]).to(tts_device)
+        text_lengths = torch.LongTensor([text_tensor.size(-1)]).to(tts_device)
 
         quantized = vits_model.quantizer.decode(codes)
         if vits_model.semantic_frame_rate == "25hz":

@@ -14,6 +14,8 @@ import torch.nn.functional as F
 import numpy as np
 from transformers import AutoModel, AutoTokenizer
 
+from kizuna_voice_designer.device_utils import resolve_device
+
 
 class SinusoidalPositionEmbeddings(nn.Module):
     def __init__(self, dim: int):
@@ -129,7 +131,7 @@ class TextToVoiceFlowCFGSynthesizer:
         text_emb_dir: str = "",
         device: str = "cuda",
     ):
-        self.device = torch.device(device if torch.cuda.is_available() else "cpu")
+        self.device = resolve_device(device)
 
         self.text_emb_dir = text_emb_dir
         if text_emb_dir:
@@ -142,7 +144,7 @@ class TextToVoiceFlowCFGSynthesizer:
             self.text_model.eval()
 
         print(f"Loading FlowMatching CFG model: {flowmatching_model_path}")
-        checkpoint = torch.load(flowmatching_model_path, map_location=self.device, weights_only=False)
+        checkpoint = torch.load(flowmatching_model_path, map_location="cpu", weights_only=False)
         config = checkpoint.get("config", {})
 
         self.flow_model = FlowMatchingVelocityNetCFG(
@@ -163,7 +165,7 @@ class TextToVoiceFlowCFGSynthesizer:
         print(f"Models loaded on {self.device}")
         print(f"Default guidance_scale: {self.guidance_scale}, num_sample_steps: {self.num_sample_steps}")
 
-    @torch.inference_mode()
+    @torch.no_grad()
     def encode_text(self, text: str, max_length: int = 512) -> torch.Tensor:
         if self.text_emb_dir:
             h = hashlib.md5(text.encode()).hexdigest()[:16]
@@ -189,7 +191,7 @@ class TextToVoiceFlowCFGSynthesizer:
 
         return embedding.float()
 
-    @torch.inference_mode()
+    @torch.no_grad()
     def sample_from_flow_cfg(
         self,
         text_emb: torch.Tensor,
@@ -233,7 +235,7 @@ class TextToVoiceFlowCFGSynthesizer:
 
         return x
 
-    @torch.inference_mode()
+    @torch.no_grad()
     def text_to_ge_embedding(
         self,
         text_prompt: str,
